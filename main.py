@@ -1,29 +1,59 @@
-import os
-import openai
+"""CLI entrypoint for the bedtime storyteller."""
+from __future__ import annotations
 
-"""
-Before submitting the assignment, describe here in a few sentences what you would have built next if you spent 2 more hours on this project:
+import argparse
+import logging
 
-"""
+from src.controller import run
+from src.session import StorySession
 
-def call_model(prompt: str, max_tokens=3000, temperature=0.1) -> str:
-    openai.api_key = os.getenv("OPENAI_API_KEY") # please use your own openai api key here.
-    resp = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        stream=False,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
-    return resp.choices[0].message["content"]  # type: ignore
-
-example_requests = "A story about a girl named Alice and her best friend Bob, who happens to be a cat."
+logger = logging.getLogger(__name__)
 
 
-def main():
-    user_input = input("What kind of story do you want to hear? ")
-    response = call_model(user_input)
-    print(response)
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Bedtime Storyteller")
+    parser.add_argument("prompt", nargs="?", help="Story request")
+    parser.add_argument("--age", dest="age", default=None)
+    parser.add_argument("--style", dest="style", default=None)
+    parser.add_argument("--interactive", action="store_true", default=True)
+    parser.add_argument("--verbose", action="store_true")
+    return parser.parse_args()
+
+
+def main() -> None:
+    """Read user input and print the final story."""
+
+    args = _parse_args()
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
+
+    try:
+        if args.prompt:
+            user_input = args.prompt
+        else:
+            user_input = input("What kind of story do you want to hear? ")
+
+        if not user_input.strip():
+            raise ValueError("Prompt must be non-empty")
+
+        session = StorySession(user_request=user_input)
+        story = run(user_input, session=session, verbose=args.verbose)
+        print(story)
+
+        if args.interactive:
+            while True:
+                feedback = input(
+                    "Any changes? (press Enter to finish, or type 'quit') "
+                ).strip()
+                if not feedback:
+                    break
+                if feedback.lower() in {"quit", "q", "exit"}:
+                    break
+                session.revision_instructions = feedback
+                story = run(session.user_request, session=session, verbose=args.verbose)
+                print(story)
+    except Exception as exc:
+        logger.error("Failed to generate story: %s", exc)
+        print("Sorry, something went wrong. Please try again.")
 
 
 if __name__ == "__main__":

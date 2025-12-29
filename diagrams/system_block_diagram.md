@@ -1,0 +1,11 @@
+# System Block Diagram
+
+```mermaid
+flowchart LR
+    U[User] --> C[Controller]
+    C --> S[Storyteller]
+    S --> J[Judge]
+    J --> C
+    C -->|Accept| O[Final Story]
+    C -->|Revise| S
+```
